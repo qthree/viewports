@@ -1,11 +1,11 @@
-use winit::{
-    window::{WindowId},
-    dpi::{PhysicalSize, PhysicalPosition},
-};
-use std::{collections::HashMap, rc::Rc, cell::RefCell};
 use imgui::sys::ImVec2;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use winit::{
+    dpi::{PhysicalPosition, PhysicalSize},
+    window::WindowId,
+};
 
-use crate::{WithLoop, Manager, Viewport, ViewportFlags, WindowSpawner};
+use crate::{Manager, Viewport, ViewportFlags, WindowSpawner, WithLoop};
 
 pub(super) type Key = usize;
 pub(super) type SharedProxy = Rc<RefCell<Proxy>>;
@@ -29,14 +29,16 @@ impl Cache {
         }
     }
     pub(super) fn set_size(&mut self, size: PhysicalSize<u32>) {
-        self.size = Some(
-            ImVec2{x: size.width as _, y: size.height as _}
-        );
+        self.size = Some(ImVec2 {
+            x: size.width as _,
+            y: size.height as _,
+        });
     }
     pub(super) fn set_pos(&mut self, pos: PhysicalPosition<i32>) {
-        self.pos = Some(
-            ImVec2{x: pos.x as _, y: pos.y as _}
-        );
+        self.pos = Some(ImVec2 {
+            x: pos.x as _,
+            y: pos.y as _,
+        });
     }
 }
 
@@ -47,7 +49,7 @@ struct Command {
 }
 #[derive(Debug)]
 enum Kind {
-    CreateWindow{flags: ViewportFlags},
+    CreateWindow { flags: ViewportFlags },
     DestroyWindow,
     ShowWindow,
     SetPos(ImVec2),
@@ -80,13 +82,16 @@ impl Proxy {
         self.caches.insert(key, cache);
         key
     }
-    pub(super) fn update<M: Manager, T, S: WindowSpawner<M::Viewport>>(&mut self, manager: &mut WithLoop<'_, M, T, S>) {
+    pub(super) fn update<M: Manager, T, S: WindowSpawner<M::Viewport>>(
+        &mut self,
+        manager: &mut WithLoop<'_, M, T, S>,
+    ) {
         /*if !self.commands.is_empty() {
             dbg!(&self.commands);
         }*/
         for Command { key, kind } in self.commands.drain(..) {
             match &kind {
-                Kind::CreateWindow{flags} => {
+                Kind::CreateWindow { flags } => {
                     let wid = manager.spawn_window(*flags);
                     let cache = Cache::new(wid);
                     self.caches.insert(key, cache);
@@ -99,7 +104,7 @@ impl Proxy {
                     let wid = self.caches.get(&key).unwrap().wid;
                     let viewport = manager.manager.viewport_mut(wid).expect("Expect viewport");
                     match kind {
-                        Kind::CreateWindow{..} | Kind::DestroyWindow => unreachable!(),
+                        Kind::CreateWindow { .. } | Kind::DestroyWindow => unreachable!(),
                         Kind::ShowWindow => {
                             manager.spawner.show_window(viewport);
                         }
@@ -184,7 +189,10 @@ impl Proxy {
     }
     #[track_caller]
     pub(super) fn expect_cache_by_wid(&mut self, wid: WindowId) -> (&Key, &mut Cache) {
-        self.caches.iter_mut().find(|(_, cache)| cache.wid == wid).expect("Expected cache!")
+        self.caches
+            .iter_mut()
+            .find(|(_, cache)| cache.wid == wid)
+            .expect("Expected cache!")
     }
     pub(super) fn cache_by_wid(&mut self, wid: WindowId) -> Option<(&Key, &mut Cache)> {
         self.caches.iter_mut().find(|(_, cache)| cache.wid == wid)
@@ -196,7 +204,7 @@ impl super::callbacks::Callbacks for Proxy {
         let key = self.next_key();
         self.commands.push(Command {
             key,
-            kind: Kind::CreateWindow{flags},
+            kind: Kind::CreateWindow { flags },
         });
         key
     }

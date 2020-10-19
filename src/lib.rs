@@ -1,8 +1,11 @@
 mod platform;
-use winit::{window::{Window, WindowId, WindowBuilder}, event_loop::EventLoopWindowTarget};
-use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 use imgui::sys as imgui_sys;
+use std::ops::{Deref, DerefMut};
+use winit::{
+    event_loop::EventLoopWindowTarget,
+    window::{Window, WindowBuilder, WindowId},
+};
 
 pub use platform::Platform;
 
@@ -25,7 +28,7 @@ pub trait Viewport {
 
 pub trait Manager: Sized {
     type Renderer;
-    type Viewport: Viewport<Renderer=Self::Renderer>;
+    type Viewport: Viewport<Renderer = Self::Renderer>;
 
     fn viewport(&self, wid: WindowId) -> Option<&Self::Viewport>;
     fn viewport_mut(&mut self, wid: WindowId) -> Option<&mut Self::Viewport>;
@@ -77,14 +80,25 @@ impl<'a, M, T: 'static, S> DerefMut for WithLoop<'a, M, T, S> {
 }
 
 pub trait WindowSpawner<V: Viewport> {
-    fn build_window<T: 'static>(&mut self, event_loop: &EventLoopWindowTarget<T>, flags: ViewportFlags) -> Window;
+    fn build_window<T: 'static>(
+        &mut self,
+        event_loop: &EventLoopWindowTarget<T>,
+        flags: ViewportFlags,
+    ) -> Window;
     fn show_window(&mut self, viewport: &V);
 }
 pub struct DefaultSpawner;
 impl<V: Viewport> WindowSpawner<V> for DefaultSpawner {
-    fn build_window<T: 'static>(&mut self, event_loop: &EventLoopWindowTarget<T>, flags: ViewportFlags) -> Window {
+    fn build_window<T: 'static>(
+        &mut self,
+        event_loop: &EventLoopWindowTarget<T>,
+        flags: ViewportFlags,
+    ) -> Window {
         let decorations = !flags.contains(ViewportFlags::NO_DECORATIONS);
-        WindowBuilder::new().with_decorations(decorations).build(event_loop).unwrap()
+        WindowBuilder::new()
+            .with_decorations(decorations)
+            .build(event_loop)
+            .unwrap()
     }
     fn show_window(&mut self, viewport: &V) {
         viewport.window().set_visible(true);
@@ -93,7 +107,7 @@ impl<V: Viewport> WindowSpawner<V> for DefaultSpawner {
 
 //use imgui_sys::ImGuiWindowFlags;
 
-bitflags!{
+bitflags! {
     #[repr(transparent)]
     pub struct ViewportFlags: u32 {
         const NO_DECORATIONS = imgui_sys::ImGuiViewportFlags_NoDecoration;
@@ -103,7 +117,7 @@ bitflags!{
         const NO_FOCUS_ON_APPEARING = imgui_sys::ImGuiViewportFlags_NoFocusOnAppearing;
 
         const NO_FOCUS_ON_CLICK = imgui_sys::ImGuiViewportFlags_NoFocusOnClick;
-        
+
         const NO_INPUTS = imgui_sys::ImGuiViewportFlags_NoInputs;
 
         const NO_RENDERER_CLEAR = imgui_sys::ImGuiViewportFlags_NoRendererClear;

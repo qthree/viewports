@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-use winit::{window::{Window, WindowId}};
-use crate::{Viewport, Manager};
+use crate::{Manager, Viewport};
 use imgui::TextureId;
 use imgui_wgpu::{RendererConfig, TextureConfig};
+use std::collections::HashMap;
+use winit::window::{Window, WindowId};
 
 pub struct Wgpu {
     pub device: wgpu::Device,
@@ -19,7 +19,10 @@ pub struct ImageData {
 impl ImageData {
     pub fn new(width: u32, height: u32, bytes: Vec<u8>, format: wgpu::TextureFormat) -> Self {
         Self {
-            width, height, bytes, format,
+            width,
+            height,
+            bytes,
+            format,
         }
     }
     #[cfg(feature = "from-image")]
@@ -31,23 +34,28 @@ impl ImageData {
         let bytes = match format {
             TextureFormat::Bgra8Unorm => image.to_bgra().into_raw(),
             TextureFormat::Rgba8Unorm => image.to_rgba().into_raw(),
-            _ => unimplemented!()
+            _ => unimplemented!(),
         };
         Self {
-            width, height, bytes, format
+            width,
+            height,
+            bytes,
+            format,
         }
     }
 }
 
 impl Wgpu {
     pub fn new(imgui: &mut imgui::Context, device: wgpu::Device, queue: wgpu::Queue) -> Self {
-        let config = RendererConfig{
+        let config = RendererConfig {
             texture_format: Outlet::format(),
             ..RendererConfig::new_srgb()
         };
         let renderer = imgui_wgpu::Renderer::new(imgui, &device, &queue, config);
         Self {
-            device, queue, renderer
+            device,
+            queue,
+            renderer,
         }
     }
     pub fn upload_image(&mut self, data: &ImageData, replace: Option<TextureId>) -> TextureId {
@@ -60,9 +68,9 @@ impl Wgpu {
             format: Some(data.format),
             ..Default::default()
         };
-    
+
         let texture = imgui_wgpu::Texture::new(&self.device, &self.renderer, texture_config);
-    
+
         texture.write(&self.queue, &data.bytes, data.width, data.height);
         if let Some(id) = replace {
             self.renderer.textures.replace(id, texture);
@@ -134,7 +142,10 @@ impl Manager for WgpuManager {
 impl WgpuManager {
     pub fn new(instance: wgpu::Instance) -> Self {
         let viewports = HashMap::new();
-        Self { viewports, instance }
+        Self {
+            viewports,
+            instance,
+        }
     }
     pub fn instance(&self) -> &wgpu::Instance {
         &self.instance
@@ -144,7 +155,7 @@ impl WgpuManager {
             viewport.window().request_redraw();
         }
     }
-    pub fn viewports_iter(&self) -> impl Iterator<Item=(&WindowId, &WgpuViewport)> {
+    pub fn viewports_iter(&self) -> impl Iterator<Item = (&WindowId, &WgpuViewport)> {
         self.viewports.iter()
     }
 }
@@ -167,11 +178,7 @@ impl WgpuViewport {
         if self.outlet.swap_chain.is_none() {
             self.create_swap_chain(device);
         }
-        self.outlet
-            .swap_chain
-            .as_mut()
-            .unwrap()
-            .get_current_frame()
+        self.outlet.swap_chain.as_mut().unwrap().get_current_frame()
     }
     fn create_swap_chain(&mut self, device: &wgpu::Device) {
         let outlet = &mut self.outlet;
@@ -194,8 +201,9 @@ impl Viewport for WgpuViewport {
         self.outlet.swap_chain = None;
     }
     fn on_draw(&mut self, wgpu: &mut Wgpu, draw_data: &imgui::DrawData) {
-        let mut encoder: wgpu::CommandEncoder =
-            wgpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        let mut encoder: wgpu::CommandEncoder = wgpu
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
         let frame = match self.get_current_frame(&wgpu.device) {
             Ok(frame) => frame,
             Err(e) => {

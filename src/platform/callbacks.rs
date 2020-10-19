@@ -1,8 +1,8 @@
+use super::proxy::{Key, Proxy, SharedProxy};
+use crate::ViewportFlags;
 use imgui::sys as imgui_sys;
 use imgui_sys::{ImGuiPlatformIO, ImGuiViewport, ImVec2};
-use super::proxy::{Proxy, Key, SharedProxy};
-use std::{rc::Rc};
-use crate::ViewportFlags;
+use std::rc::Rc;
 
 pub(super) trait Callbacks {
     fn create_window(&mut self, flags: ViewportFlags) -> Key;
@@ -75,7 +75,9 @@ pub fn register_platform_callbacks(platform: &mut ImGuiPlatformIO) {
         }*/
         *pos = from_vp(vp, |proxy, key| proxy.get_position(*key));
     }
-    unsafe{ImGuiPlatformIO_Set_Platform_GetWindowPos(platform, get_window_pos);}
+    unsafe {
+        ImGuiPlatformIO_Set_Platform_GetWindowPos(platform, get_window_pos);
+    }
 
     unsafe extern "C" fn set_window_size(vp: *mut ImGuiViewport, size: ImVec2) {
         from_vp(vp, |proxy, key| {
@@ -87,7 +89,9 @@ pub fn register_platform_callbacks(platform: &mut ImGuiPlatformIO) {
     unsafe extern "C" fn get_window_size(vp: *mut ImGuiViewport, size: *mut ImVec2) {
         *size = from_vp(vp, |proxy, key| proxy.get_size(*key));
     }
-    unsafe{ImGuiPlatformIO_Set_Platform_GetWindowSize(platform, get_window_size);}
+    unsafe {
+        ImGuiPlatformIO_Set_Platform_GetWindowSize(platform, get_window_size);
+    }
 
     unsafe extern "C" fn set_window_focus(vp: *mut ImGuiViewport) {
         from_vp(vp, |proxy, key| {
@@ -121,7 +125,13 @@ pub fn register_platform_callbacks(platform: &mut ImGuiPlatformIO) {
 type PlatformUserCallback = unsafe extern "C" fn(*mut ImGuiViewport, *mut ImVec2);
 extern "C" {
     //void ImGuiPlatformIO_Set_Platform_GetWindowPos(ImGuiPlatformIO* platform_io, void(*user_callback)(ImGuiViewport* vp, ImVec2* out_pos))
-    fn ImGuiPlatformIO_Set_Platform_GetWindowPos(platform_io: &mut ImGuiPlatformIO, user_callback: PlatformUserCallback);
+    fn ImGuiPlatformIO_Set_Platform_GetWindowPos(
+        platform_io: &mut ImGuiPlatformIO,
+        user_callback: PlatformUserCallback,
+    );
     //void ImGuiPlatformIO_Set_Platform_GetWindowSize(ImGuiPlatformIO* platform_io, void(*user_callback)(ImGuiViewport* vp, ImVec2* out_size))
-    fn ImGuiPlatformIO_Set_Platform_GetWindowSize(platform_io: &mut ImGuiPlatformIO, user_callback: PlatformUserCallback);
+    fn ImGuiPlatformIO_Set_Platform_GetWindowSize(
+        platform_io: &mut ImGuiPlatformIO,
+        user_callback: PlatformUserCallback,
+    );
 }

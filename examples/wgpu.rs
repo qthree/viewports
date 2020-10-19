@@ -1,10 +1,15 @@
 use futures::executor::block_on;
-use imgui::{im_str, FontSource, Condition};
-use winit::{dpi::LogicalSize, event::{Event, WindowEvent}, event_loop::{ControlFlow, EventLoop}, window::{Window, WindowId}};
+use imgui::{im_str, Condition, FontSource};
+use winit::{
+    dpi::LogicalSize,
+    event::{Event, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+    window::{Window, WindowId},
+};
 
 use viewports::{
     wgpu::{Wgpu, WgpuManager},
-    Viewport, Manager, Platform,
+    Manager, Platform, Viewport,
 };
 
 fn setup_first_window<T: 'static>(event_loop: &EventLoop<T>) -> (WgpuManager, WindowId) {
@@ -27,10 +32,14 @@ fn setup_first_window<T: 'static>(event_loop: &EventLoop<T>) -> (WgpuManager, Wi
 }
 
 fn setup_adapter(manager: &WgpuManager, main_view: WindowId) -> wgpu::Adapter {
-    block_on(manager.instance().request_adapter(&wgpu::RequestAdapterOptions {
-        power_preference: wgpu::PowerPreference::LowPower,
-        compatible_surface: Some(manager.viewport(main_view).unwrap().surface()),
-    }))
+    block_on(
+        manager
+            .instance()
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::LowPower,
+                compatible_surface: Some(manager.viewport(main_view).unwrap().surface()),
+            }),
+    )
     .unwrap()
 }
 
@@ -79,7 +88,7 @@ fn main() {
 
     let adapter = setup_adapter(&manager, main_view);
     dbg!(adapter.get_info());
-    
+
     let mut imgui = setup_imgui(1.0);
 
     let mut platform = Platform::init(&mut imgui, manager.viewport(main_view).unwrap());
@@ -93,7 +102,7 @@ fn main() {
 
         let mut manager_with_loop = manager.with_loop(event_loop);
         match &event {
-            Event::WindowEvent{
+            Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 window_id,
             } if *window_id == main_view => {
@@ -130,7 +139,9 @@ fn main() {
             }
             Event::RedrawRequested(window_id) => {
                 if let Some(draw_data) = platform.draw_data(&mut imgui, *window_id) {
-                    let viewport = manager_with_loop.viewport_mut(*window_id).expect("Expect viewport");
+                    let viewport = manager_with_loop
+                        .viewport_mut(*window_id)
+                        .expect("Expect viewport");
                     viewport.on_draw(&mut renderer, draw_data);
                 }
             }

@@ -3,20 +3,24 @@ use winit::{
         ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta, TouchPhase,
         VirtualKeyCode, WindowEvent,
     },
-    window::{WindowId},
+    window::WindowId,
 };
 
-use imgui::{BackendFlags, Context, ImString, Io, Key, Ui, sys as imgui_sys};
+use imgui::{sys as imgui_sys, BackendFlags, Context, ImString, Io, Key, Ui};
 use imgui_sys::{ImGuiPlatformIO, ImGuiViewport};
-use std::{cmp::Ordering, time::{Instant, Duration}, rc::Rc};
+use std::{
+    cmp::Ordering,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
-mod proxy;
 mod callbacks;
-use proxy::{Proxy, Cache, SharedProxy};
+mod proxy;
+use proxy::{Cache, Proxy, SharedProxy};
 
 /// winit backend platform state
 #[derive(Debug)]
-pub struct Platform { 
+pub struct Platform {
     main_view: WindowId,
     proxy: SharedProxy,
     last_frame: Instant,
@@ -37,10 +41,10 @@ impl Platform {
         ))));
 
         let io = imgui.io_mut();
-        let has_viewports = unsafe{
+        let has_viewports = unsafe {
             BackendFlags::from_bits_unchecked(
                 imgui_sys::ImGuiBackendFlags_PlatformHasViewports
-                | imgui_sys::ImGuiBackendFlags_RendererHasViewports
+                    | imgui_sys::ImGuiBackendFlags_RendererHasViewports,
             )
         };
         io.backend_flags.insert(has_viewports);
@@ -92,7 +96,7 @@ impl Platform {
             io.raw_mut().BackendPlatformUserData = Rc::into_raw(Rc::clone(&proxy)) as _;
         }
 
-        let platform_io = imgui.platform_io(); 
+        let platform_io = imgui.platform_io();
         callbacks::register_platform_callbacks(platform_io);
 
         unsafe {
@@ -105,7 +109,7 @@ impl Platform {
             //use imgui::internal::RawCast;
             //imgui.io_mut().raw_mut().BackendPlatformUserData = Rc::into_raw(Rc::clone(&proxy)) as _;
         }*/
-        
+
         let last_frame = Instant::now();
 
         Platform {
@@ -118,7 +122,12 @@ impl Platform {
         }
     }
 
-    pub fn handle_event<T, M: crate::Manager>(&mut self, io: &mut Io, window_manager: &mut M, event: &Event<T>) {
+    pub fn handle_event<T, M: crate::Manager>(
+        &mut self,
+        io: &mut Io,
+        window_manager: &mut M,
+        event: &Event<T>,
+    ) {
         match *event {
             Event::WindowEvent {
                 window_id,
@@ -140,18 +149,30 @@ impl Platform {
         }
     }
 
-    fn handle_main_view_event<V: crate::Viewport>(io: &mut Io, _viewport: &mut V, _cache: &mut Cache, event: &WindowEvent) {
+    fn handle_main_view_event<V: crate::Viewport>(
+        io: &mut Io,
+        _viewport: &mut V,
+        _cache: &mut Cache,
+        event: &WindowEvent,
+    ) {
         match *event {
             WindowEvent::Resized(physical_size) => {
                 io.display_size = [physical_size.width as f32, physical_size.height as f32];
-            },
+            }
             _ => {}
         }
     }
 
-    fn handle_window_event<V: crate::Viewport>(io: &mut Io, viewport: &mut V, cache: &mut Cache, event: &WindowEvent) {
+    fn handle_window_event<V: crate::Viewport>(
+        io: &mut Io,
+        viewport: &mut V,
+        cache: &mut Cache,
+        event: &WindowEvent,
+    ) {
         match *event {
-            WindowEvent::ScaleFactorChanged { scale_factor: _, .. } => {
+            WindowEvent::ScaleFactorChanged {
+                scale_factor: _, ..
+            } => {
                 /*let hidpi_factor = match self.hidpi_mode {
                     ActiveHiDpiMode::Default => scale_factor,
                     ActiveHiDpiMode::Rounded => scale_factor.round(),
@@ -222,7 +243,7 @@ impl Platform {
                 io.mouse_pos = [position.x as f32, position.y as f32];
                 */
                 let position = position.cast::<f32>();
-                let winpos =  viewport.window().outer_position().unwrap().cast::<f32>();
+                let winpos = viewport.window().outer_position().unwrap().cast::<f32>();
                 io.mouse_pos = [position.x + winpos.x, position.y + winpos.y];
             }
             WindowEvent::CursorLeft { .. } => {
@@ -298,11 +319,18 @@ impl Platform {
             _ => {}
         }
     }
-    pub fn frame<T, M: crate::Manager, F: FnOnce(&Ui, Duration), S: super::WindowSpawner<M::Viewport>>(&mut self, imgui: &mut Context, manager: &mut crate::WithLoop<M, T, S>, frame: F) {
-        update_monitors(
-            manager,
-            imgui.platform_io()
-        );
+    pub fn frame<
+        T,
+        M: crate::Manager,
+        F: FnOnce(&Ui, Duration),
+        S: super::WindowSpawner<M::Viewport>,
+    >(
+        &mut self,
+        imgui: &mut Context,
+        manager: &mut crate::WithLoop<M, T, S>,
+        frame: F,
+    ) {
+        update_monitors(manager, imgui.platform_io());
 
         let now = Instant::now();
         let delta_s = now - self.last_frame;
@@ -361,7 +389,7 @@ impl Platform {
 }
 
 fn update_monitors<M, T, S>(with_loop: &crate::WithLoop<M, T, S>, platform: &mut ImGuiPlatformIO) {
-    use imgui_sys::{ImVec2, ImGuiPlatformMonitor};
+    use imgui_sys::{ImGuiPlatformMonitor, ImVec2};
     let mut monitors = if platform.Monitors.Data.is_null() {
         Vec::with_capacity(with_loop.event_loop.available_monitors().size_hint().0)
     } else {
@@ -375,26 +403,32 @@ fn update_monitors<M, T, S>(with_loop: &crate::WithLoop<M, T, S>, platform: &mut
         unsafe { Vec::from_raw_parts(ptr, length, capacity) }
     };
     monitors.clear();
-    monitors.extend(with_loop.event_loop.available_monitors().take(32).map(|monitor| {
-        let pos = monitor.position();
-        let posf = ImVec2 {
-            x: pos.x as _,
-            y: pos.y as _,
-        };
-        let size = monitor.size();
-        let sizef = ImVec2 {
-            x: size.width as _,
-            y: size.height as _,
-        };
+    monitors.extend(
+        with_loop
+            .event_loop
+            .available_monitors()
+            .take(32)
+            .map(|monitor| {
+                let pos = monitor.position();
+                let posf = ImVec2 {
+                    x: pos.x as _,
+                    y: pos.y as _,
+                };
+                let size = monitor.size();
+                let sizef = ImVec2 {
+                    x: size.width as _,
+                    y: size.height as _,
+                };
 
-        ImGuiPlatformMonitor {
-            MainPos: posf,
-            MainSize: sizef,
-            WorkPos: posf,
-            WorkSize: sizef,
-            DpiScale: monitor.scale_factor() as _,
-        }
-    }));
+                ImGuiPlatformMonitor {
+                    MainPos: posf,
+                    MainSize: sizef,
+                    WorkPos: posf,
+                    WorkSize: sizef,
+                    DpiScale: monitor.scale_factor() as _,
+                }
+            }),
+    );
     //let (ptr, length, capacity) = monitors.into_raw_parts();
     //use std::convert::TryInto;
     let (ptr, length, capacity) = (monitors.as_mut_ptr(), monitors.len(), monitors.capacity());
@@ -408,7 +442,9 @@ fn update_monitors<M, T, S>(with_loop: &crate::WithLoop<M, T, S>, platform: &mut
 unsafe trait HasPlatformIO {
     fn platform_io(&mut self) -> &mut ImGuiPlatformIO {
         unsafe {
-            imgui_sys::igGetPlatformIO().as_mut().expect("ImGuiPlatformIO")
+            imgui_sys::igGetPlatformIO()
+                .as_mut()
+                .expect("ImGuiPlatformIO")
         }
     }
     fn update_platform_windows(&mut self) {
