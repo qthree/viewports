@@ -15,7 +15,8 @@ from-image = ["wgpu-renderer", "image"]
 winit = "0.23"
 raw-window-handle = "0.3"
 bitflags = "1.2"
-wgpu = { version = "0.6", optional = true }
+#wgpu = { version = "0.6", optional = true }
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", optional = true }
 image = { version = "0.23", default-features = false, optional = true }
 
 [dependencies.imgui]
@@ -25,7 +26,9 @@ branch = "release/docking/0.5.0"
 [dependencies.imgui-wgpu]
 #git = "https://github.com/Yatekii/imgui-wgpu-rs.git"
 git = "https://github.com/qthree/imgui-wgpu-rs.git" # the only change here is the use of imgui-docking-rs instead of imgui-rs
-branch = "docking"
+branch = "docking-wgpu-master"
+#branch = "docking"
+#path = "../imgui-wgpu-rs"
 optional = true
 
 [dev-dependencies]
@@ -38,3 +41,4 @@ cgmath = "0.17"
 [[example]]
 name = "wgpu"
 required-features = ["wgpu-renderer", "from-image"]
+

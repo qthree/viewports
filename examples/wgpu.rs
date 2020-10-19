@@ -13,7 +13,7 @@ use viewports::{
 };
 
 fn setup_first_window<T: 'static>(event_loop: &EventLoop<T>) -> (WgpuManager, WindowId) {
-    let instance = wgpu::Instance::new(wgpu::BackendBit::DX12);
+    let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
     let mut manager = WgpuManager::new(instance);
 
     let version = env!("CARGO_PKG_VERSION");
