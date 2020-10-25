@@ -82,25 +82,21 @@ impl Wgpu {
 }
 
 #[derive(Debug)]
-pub struct Outlet {
-    surface: wgpu::Surface,
-    sc_desc: wgpu::SwapChainDescriptor,
-    swap_chain: Option<wgpu::SwapChain>,
+pub enum Outlet {
+    Surface(wgpu::Surface),
+    SwapChain(wgpu::SwapChain),
+    Invalid,
 }
 impl Outlet {
     fn new(surface: wgpu::Surface) -> Self {
-        Outlet {
-            surface,
-            sc_desc: Self::desc(),
-            swap_chain: None,
-        }
+        Outlet::Surface(surface)
     }
-    fn desc() -> wgpu::SwapChainDescriptor {
+    fn desc(width: u32, height: u32) -> wgpu::SwapChainDescriptor {
         wgpu::SwapChainDescriptor {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
             format: Self::format(),
-            width: 0,
-            height: 0,
+            width,
+            height,
             present_mode: wgpu::PresentMode::Fifo,
         }
     }
@@ -150,45 +146,71 @@ impl WgpuManager {
     pub fn instance(&self) -> &wgpu::Instance {
         &self.instance
     }
-    pub fn reqwest_redraws(&self) {
-        for viewport in self.viewports.values() {
-            viewport.window().request_redraw();
+    pub fn request_redraws(&mut self) {
+        for (_wid, viewport) in &mut self.viewports {
+            viewport.complete_redraw();
         }
     }
     pub fn viewports_iter(&self) -> impl Iterator<Item = (&WindowId, &WgpuViewport)> {
         self.viewports.iter()
+    }
+    pub fn viewports_to_redraw(&mut self) -> impl Iterator<Item = (&WindowId, &mut WgpuViewport)> {
+        self.viewports.iter_mut().filter(|(_, vp)| vp.waits_redraw)
     }
 }
 
 pub struct WgpuViewport {
     window: Window,
     outlet: Outlet,
+    waits_redraw: bool,
 }
 impl WgpuViewport {
     fn with_surface(window: Window, surface: wgpu::Surface) -> Self {
         Self {
             window,
             outlet: Outlet::new(surface),
+            waits_redraw: false,
         }
     }
     fn get_current_frame(
         &mut self,
         device: &wgpu::Device,
     ) -> Result<wgpu::SwapChainFrame, wgpu::SwapChainError> {
-        if self.outlet.swap_chain.is_none() {
-            self.create_swap_chain(device);
+        self.with_swap_chain(device, |swap_chain| {
+            swap_chain.get_current_frame()
+        })
+    }
+    fn with_swap_chain<R, F: FnOnce(&wgpu::SwapChain) -> R>(&mut self, device: &wgpu::Device, fun: F) -> R {
+        let outlet = std::mem::replace(&mut self.outlet, Outlet::Invalid);
+        let sc = match outlet {
+            Outlet::Surface(surface) => {
+                let outlet = &mut self.outlet;
+                let size = self.window.inner_size();
+                let sc_desc = Outlet::desc(size.width, size.height);
+                device.create_swap_chain(surface, &sc_desc)
+            }
+            Outlet::SwapChain(swapchain) => swapchain,
+            Outlet::Invalid => panic!("Invalid outlet: surface lost."),
+        };
+        let ret = fun(&sc);
+        self.outlet = Outlet::SwapChain(sc);
+        ret
+    }
+    fn drop_swap_chain(&mut self) {
+        let outlet = std::mem::replace(&mut self.outlet, Outlet::Invalid);
+        self.outlet = match outlet {
+            Outlet::SwapChain(sc) => Outlet::Surface(sc.into_surface()),
+            other => other,
+        };
+    }
+    pub fn surface(&self) -> Option<&wgpu::Surface> {
+        match &self.outlet {
+            Outlet::Surface(surface) => Some(surface),
+            _ => None,
         }
-        self.outlet.swap_chain.as_mut().unwrap().get_current_frame()
     }
-    fn create_swap_chain(&mut self, device: &wgpu::Device) {
-        let outlet = &mut self.outlet;
-        let size = self.window.inner_size();
-        outlet.sc_desc.width = size.width;
-        outlet.sc_desc.height = size.height;
-        outlet.swap_chain = Some(device.create_swap_chain(&outlet.surface, &outlet.sc_desc));
-    }
-    pub fn surface(&self) -> &wgpu::Surface {
-        &self.outlet.surface
+    pub fn complete_redraw(&mut self) {
+        self.waits_redraw = true;
     }
 }
 
@@ -198,9 +220,11 @@ impl Viewport for WgpuViewport {
         &self.window
     }
     fn on_resize(&mut self) {
-        self.outlet.swap_chain = None;
+        self.drop_swap_chain();
     }
-    fn on_draw(&mut self, wgpu: &mut Wgpu, draw_data: &imgui::DrawData) {
+    fn on_draw(&mut self, wgpu: &mut Wgpu, draw_data: Option<&imgui::DrawData>) {
+        self.waits_redraw = false;
+
         let mut encoder: wgpu::CommandEncoder = wgpu
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
@@ -230,10 +254,14 @@ impl Viewport for WgpuViewport {
             depth_stencil_attachment: None,
         });
 
-        wgpu.renderer
-            .render(draw_data, &wgpu.queue, &wgpu.device, &mut rpass)
-            .expect("Rendering failed");
+        if let Some(draw_data) = draw_data {
+            wgpu.renderer
+                .render(draw_data, &wgpu.queue, &wgpu.device, &mut rpass)
+                .expect("Rendering failed");
+        }
+
         drop(rpass);
         wgpu.queue.submit(Some(encoder.finish()));
+        wgpu.queue.present(frame);
     }
 }

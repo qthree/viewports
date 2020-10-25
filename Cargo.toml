@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = []
+default = ["wgpu-renderer", "from-image"]
 wgpu-renderer = ["wgpu", "imgui-wgpu"]
 from-image = ["wgpu-renderer", "image"]
 
@@ -16,7 +16,8 @@ winit = "0.23"
 raw-window-handle = "0.3"
 bitflags = "1.2"
 #wgpu = { version = "0.6", optional = true }
-wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", optional = true }
+#wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", optional = true }
+wgpu = { path = "../wgpu-rs", optional = true }
 image = { version = "0.23", default-features = false, optional = true }
 
 [dependencies.imgui]
@@ -25,10 +26,10 @@ branch = "release/docking/0.5.0"
 
 [dependencies.imgui-wgpu]
 #git = "https://github.com/Yatekii/imgui-wgpu-rs.git"
-git = "https://github.com/qthree/imgui-wgpu-rs.git" # the only change here is the use of imgui-docking-rs instead of imgui-rs
-branch = "docking-wgpu-master"
+#git = "https://github.com/qthree/imgui-wgpu-rs.git" # the only change here is the use of imgui-docking-rs instead of imgui-rs
+#branch = "docking-wgpu-master"
 #branch = "docking"
-#path = "../imgui-wgpu-rs"
+path = "../imgui-wgpu-rs"
 optional = true
 
 [dev-dependencies]
@@ -41,4 +42,14 @@ cgmath = "0.17"
 [[example]]
 name = "wgpu"
 required-features = ["wgpu-renderer", "from-image"]
+
+[patch.crates-io]
+winit = { git = "https://github.com/rust-windowing/winit.git" }
+#wgpu-core = { version = "0.6", path = "../wgpu/wgpu-core" }
+#gfx-hal = { version = "0.6", path = "../gfx/src/hal" }
+#gfx-backend-empty = { version = "0.6", path = "../gfx/src/backend/empty" }
+#gfx-backend-vulkan = { version = "0.6", path = "../gfx/src/backend/vulkan" }
+#gfx-backend-dx12 = { version = "0.6", path = "../gfx/src/backend/dx12" }
+#gfx-backend-dx11 = { version = "0.6", path = "../gfx/src/backend/dx11" }
+#gfx-backend-metal = { version = "0.6", path = "../gfx/src/backend/metal" }
 

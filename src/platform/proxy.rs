@@ -1,4 +1,4 @@
-use imgui::sys::ImVec2;
+use imgui::sys::{ImVec2, ImGuiID};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
@@ -7,14 +7,14 @@ use winit::{
 
 use crate::{Manager, Viewport, ViewportFlags, WindowSpawner, WithLoop};
 
-pub(super) type Key = usize;
+pub(super) type Key = ImGuiID;
 pub(super) type SharedProxy = Rc<RefCell<Proxy>>;
 
 #[derive(Debug)]
 pub struct Cache {
     pub(super) wid: WindowId,
     pub(super) minimized: bool,
-    pub(super) focus: bool,
+    //pub(super) focus: bool,
     pub(super) size: Option<ImVec2>,
     pub(super) pos: Option<ImVec2>,
 }
@@ -23,7 +23,7 @@ impl Cache {
         Self {
             wid,
             minimized: false,
-            focus: true,
+            //focus: true,
             size: None,
             pos: None,
         }
@@ -63,6 +63,7 @@ pub(super) struct Proxy {
     caches: HashMap<Key, Cache>,
     commands: Vec<Command>,
     next_id: Key,
+    pub(super) focus: Option<Key>,
 }
 
 impl Proxy {
@@ -71,16 +72,15 @@ impl Proxy {
             caches: HashMap::new(),
             commands: vec![],
             next_id: 1,
+            focus: None,
         }
     }
     pub(super) fn shared() -> SharedProxy {
         Rc::new(RefCell::new(Self::new()))
     }
-    pub(super) fn use_window(&mut self, wid: WindowId) -> Key {
+    pub(super) fn use_window(&mut self, key: Key, wid: WindowId) {
         let cache = Cache::new(wid);
-        let key = self.next_key();
         self.caches.insert(key, cache);
-        key
     }
     pub(super) fn update<M: Manager, T, S: WindowSpawner<M::Viewport>>(
         &mut self,
@@ -124,6 +124,7 @@ impl Proxy {
                             viewport.on_resize();
                         }
                         Kind::SetFocus => {
+                            self.focus = Some(key);
                             //unimplemented!();
                         }
                         Kind::SetTitle(title) => viewport.window().set_title(&title),
@@ -140,11 +141,6 @@ impl Proxy {
                 cache.set_pos(window.outer_position().unwrap());
             }
         }
-    }
-    fn next_key(&mut self) -> Key {
-        let key = self.next_id;
-        self.next_id += 1;
-        key
     }
     /*pub fn draw_data<F>(
         &self,
@@ -197,16 +193,17 @@ impl Proxy {
     pub(super) fn cache_by_wid(&mut self, wid: WindowId) -> Option<(&Key, &mut Cache)> {
         self.caches.iter_mut().find(|(_, cache)| cache.wid == wid)
     }
+    pub(super) fn wid_by_key(&self, key: Key) -> Option<WindowId> {
+        self.cache(key).map(|cache| cache.wid)
+    }
 }
 
 impl super::callbacks::Callbacks for Proxy {
-    fn create_window(&mut self, flags: ViewportFlags) -> Key {
-        let key = self.next_key();
+    fn create_window(&mut self, key: Key, flags: ViewportFlags) {
         self.commands.push(Command {
             key,
             kind: Kind::CreateWindow { flags },
         });
-        key
     }
     fn destroy_window(&mut self, key: Key) {
         self.commands.push(Command {
@@ -252,7 +249,8 @@ impl super::callbacks::Callbacks for Proxy {
     }
     fn get_focus(&self, key: Key) -> bool {
         // cache can be none for the first frame
-        self.cache(key).map(|cache| cache.focus).unwrap_or(false)
+        //self.cache(key).map(|cache| cache.focus).unwrap_or(false)
+        self.focus == Some(key)
     }
     fn get_minimized(&self, key: Key) -> bool {
         self.expect_cache(key).minimized

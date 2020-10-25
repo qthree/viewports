@@ -5,7 +5,7 @@ use imgui_sys::{ImGuiPlatformIO, ImGuiViewport, ImVec2};
 use std::rc::Rc;
 
 pub(super) trait Callbacks {
-    fn create_window(&mut self, flags: ViewportFlags) -> Key;
+    fn create_window(&mut self, key: Key, flags: ViewportFlags);
     fn destroy_window(&mut self, key: Key);
     fn show_window(&mut self, key: Key);
     fn set_position(&mut self, key: Key, pos: ImVec2);
@@ -39,8 +39,9 @@ pub fn register_platform_callbacks(platform: &mut ImGuiPlatformIO) {
     unsafe extern "C" fn create_window(vp: *mut ImGuiViewport) {
         from_vp(vp, |proxy, key| {
             assert_eq!(*key, 0);
+            *key = (*vp).ID; 
             let flags = (*vp).Flags as u32;
-            *key = proxy.create_window(ViewportFlags::from_bits_unchecked(flags));
+            proxy.create_window(*key, ViewportFlags::from_bits_unchecked(flags));
             //dbg!(key);
             //dbg!((*vp).PlatformUserData);
         });

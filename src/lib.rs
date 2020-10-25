@@ -7,7 +7,9 @@ use winit::{
     window::{Window, WindowBuilder, WindowId},
 };
 
-pub use platform::Platform;
+pub use platform::{
+    Platform,
+};
 
 #[cfg(feature = "wgpu-renderer")]
 pub mod wgpu;
@@ -23,7 +25,7 @@ pub trait Viewport {
     type Renderer;
     fn window(&self) -> &Window;
     fn on_resize(&mut self);
-    fn on_draw(&mut self, renderer: &mut Self::Renderer, draw_data: &imgui::DrawData);
+    fn on_draw(&mut self, renderer: &mut Self::Renderer, draw_data: Option<&imgui::DrawData>);
 }
 
 pub trait Manager: Sized {

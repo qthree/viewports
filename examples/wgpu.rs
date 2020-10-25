@@ -36,8 +36,8 @@ fn setup_adapter(manager: &WgpuManager, main_view: WindowId) -> wgpu::Adapter {
         manager
             .instance()
             .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::LowPower,
-                compatible_surface: Some(manager.viewport(main_view).unwrap().surface()),
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: manager.viewport(main_view).unwrap().surface(),
             }),
     )
     .unwrap()
@@ -135,13 +135,16 @@ fn main() {
 
                     ui.show_demo_window(&mut demo_open);
                 });
-                manager_with_loop.reqwest_redraws();
+                manager_with_loop.request_redraws();
             }
             Event::RedrawRequested(window_id) => {
-                if let Some(draw_data) = platform.draw_data(&mut imgui, *window_id) {
-                    let viewport = manager_with_loop
-                        .viewport_mut(*window_id)
-                        .expect("Expect viewport");
+                if let Some(viewport) = manager_with_loop.viewport_mut(*window_id) {
+                    viewport.complete_redraw();
+                }
+            }
+            Event::RedrawEventsCleared => {
+                for (window_id, viewport) in manager_with_loop.viewports_to_redraw() {
+                    let draw_data = platform.draw_data(&mut imgui, *window_id);
                     viewport.on_draw(&mut renderer, draw_data);
                 }
             }

@@ -6,7 +6,7 @@ use winit::{
     window::WindowId,
 };
 
-use imgui::{sys as imgui_sys, BackendFlags, Context, ImString, Io, Key, Ui};
+use imgui::{sys as imgui_sys, BackendFlags, Context, ImString, ImStr, Io, Key, Ui};
 use imgui_sys::{ImGuiPlatformIO, ImGuiViewport};
 use std::{
     cmp::Ordering,
@@ -16,7 +16,10 @@ use std::{
 
 mod callbacks;
 mod proxy;
+mod focus_order;
+
 use proxy::{Cache, Proxy, SharedProxy};
+
 
 /// winit backend platform state
 #[derive(Debug)]
@@ -87,20 +90,23 @@ impl Platform {
         //let cache = HashMap::new();
         //cache.insert(main_view, Cache::default());
 
-        let proxy = Proxy::shared();
-        let main_view = main_view.window().id();
-        let main_view_key = proxy.borrow_mut().use_window(main_view);
-
-        unsafe {
-            use imgui::internal::RawCast;
-            io.raw_mut().BackendPlatformUserData = Rc::into_raw(Rc::clone(&proxy)) as _;
-        }
-
         let platform_io = imgui.platform_io();
         callbacks::register_platform_callbacks(platform_io);
 
+        let main_view_key = unsafe {
+            let main_vp = &mut (*platform_io.MainViewport);
+            let key = main_vp.ID;
+            main_vp.PlatformUserData = key as _;
+            key
+        };
+
+        let proxy = Proxy::shared();
+        let main_view = main_view.window().id();
+        proxy.borrow_mut().use_window(main_view_key, main_view);
+
         unsafe {
-            (*platform_io.MainViewport).PlatformUserData = main_view_key as _;
+            use imgui::internal::RawCast;
+            imgui.io_mut().raw_mut().BackendPlatformUserData = Rc::into_raw(Rc::clone(&proxy)) as _;
         }
 
         /*assert_eq!(std::mem::size_of::<WindowId>(), std::mem::size_of::<usize>());
@@ -137,10 +143,17 @@ impl Platform {
                 let main_view = self.main_view;
                 if let Some(viewport) = viewport {
                     let mut proxy = self.proxy.borrow_mut();
-                    let cache = proxy.expect_cache_by_wid(window_id).1;
+                    let (&key, cache) = proxy.expect_cache_by_wid(window_id);
                     Self::handle_window_event(io, viewport, cache, event);
                     if window_id == main_view {
                         Self::handle_main_view_event(io, viewport, cache, event);
+                    }
+                    if let WindowEvent::Focused(focus) = event {
+                        proxy.focus = if *focus {
+                            Some(key)
+                        } else {
+                            None
+                        };
                     }
                 }
                 self.handle_global_event(io, event);
@@ -211,9 +224,9 @@ impl Platform {
                     io.add_input_character(ch)
                 }
             }
-            WindowEvent::Focused(focus) => {
+            /*WindowEvent::Focused(focus) => {
                 cache.focus = focus;
-            }
+            }*/
             WindowEvent::Moved(pos) => {
                 #[cfg(windows)]
                 {
@@ -373,7 +386,8 @@ impl Platform {
                 if vp.PlatformUserData.is_null() {
                     continue;
                 }
-                let key: proxy::Key = std::mem::transmute(vp.PlatformUserData);
+                let key_long: usize = std::mem::transmute(vp.PlatformUserData);
+                let key: proxy::Key = key_long as _;
                 if key != search_key {
                     continue;
                 }
@@ -385,6 +399,12 @@ impl Platform {
     }
     pub fn last_frame(&self) -> Instant {
         self.last_frame
+    }
+    pub fn focus_order<'a: 'b, 'b>(&'b self, imgui: &'a mut imgui::Context) -> impl 'b + Iterator<Item = (&'a ImStr, WindowId)> {
+        let proxy = self.proxy.borrow();
+        focus_order::focus_order(imgui).filter_map(move |(name, key)| {
+            proxy.wid_by_key(key).map(|wid| (name, wid))
+        })
     }
 }
 
