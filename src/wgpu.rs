@@ -32,8 +32,8 @@ impl ImageData {
         let (width, height) = image.dimensions();
         let format = Outlet::format();
         let bytes = match format {
-            TextureFormat::Bgra8Unorm => image.to_bgra().into_raw(),
-            TextureFormat::Rgba8Unorm => image.to_rgba().into_raw(),
+            TextureFormat::Bgra8Unorm => image.to_bgra8().into_raw(),
+            TextureFormat::Rgba8Unorm => image.to_rgba8().into_raw(),
             _ => unimplemented!(),
         };
         Self {
@@ -84,7 +84,7 @@ impl Wgpu {
 #[derive(Debug)]
 pub enum Outlet {
     Surface(wgpu::Surface),
-    SwapChain(wgpu::SwapChain),
+    SwapChain(wgpu::Surface, wgpu::SwapChain),
     Invalid,
 }
 impl Outlet {
@@ -93,7 +93,7 @@ impl Outlet {
     }
     fn desc(width: u32, height: u32) -> wgpu::SwapChainDescriptor {
         wgpu::SwapChainDescriptor {
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+            usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
             format: Self::format(),
             width,
             height,
@@ -181,25 +181,24 @@ impl WgpuViewport {
         })
     }
     fn with_swap_chain<R, F: FnOnce(&wgpu::SwapChain) -> R>(&mut self, device: &wgpu::Device, fun: F) -> R {
-        let outlet = std::mem::replace(&mut self.outlet, Outlet::Invalid);
-        let sc = match outlet {
-            Outlet::Surface(surface) => {
-                let outlet = &mut self.outlet;
-                let size = self.window.inner_size();
-                let sc_desc = Outlet::desc(size.width, size.height);
-                device.create_swap_chain(surface, &sc_desc)
-            }
-            Outlet::SwapChain(swapchain) => swapchain,
-            Outlet::Invalid => panic!("Invalid outlet: surface lost."),
-        };
-        let ret = fun(&sc);
-        self.outlet = Outlet::SwapChain(sc);
-        ret
+        let mut outlet = std::mem::replace(&mut self.outlet, Outlet::Invalid);
+        if let Outlet::Surface(surface) = outlet {
+            let size = self.window.inner_size();
+            let sc_desc = Outlet::desc(size.width, size.height);
+            let swapchain = device.create_swap_chain(&surface, &sc_desc);
+            outlet = Outlet::SwapChain(surface, swapchain);
+        }
+        if let Outlet::SwapChain(_surface, swapchain) = &outlet {
+            let ret = fun(swapchain);
+            self.outlet = outlet;
+            return ret;
+        }
+        panic!("Invalid outlet: surface lost.")
     }
     fn drop_swap_chain(&mut self) {
         let outlet = std::mem::replace(&mut self.outlet, Outlet::Invalid);
         self.outlet = match outlet {
-            Outlet::SwapChain(sc) => Outlet::Surface(sc.into_surface()),
+            Outlet::SwapChain(surface, _swapchain) => Outlet::Surface(surface),
             other => other,
         };
     }
@@ -243,6 +242,7 @@ impl Viewport for WgpuViewport {
             a: 1.0,
         };
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                 attachment: &frame.output.view,
                 resolve_target: None,
@@ -262,6 +262,6 @@ impl Viewport for WgpuViewport {
 
         drop(rpass);
         wgpu.queue.submit(Some(encoder.finish()));
-        wgpu.queue.present(frame);
+        drop(frame);
     }
 }

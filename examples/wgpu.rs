@@ -70,7 +70,7 @@ fn setup_renderer(adapter: &wgpu::Adapter, imgui: &mut imgui::Context) -> Wgpu {
         &wgpu::DeviceDescriptor {
             features: wgpu::Features::empty(),
             limits: wgpu::Limits::default(),
-            shader_validation: false,
+            label: None,
         },
         None,
     ))
